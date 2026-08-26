@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-// Student menyimpan informasi seorang mahasiswa.
+// Student menyimpan informasi seorang mahasiswa
 type Student struct {
 	ID       string
 	Name     string
@@ -10,7 +10,7 @@ type Student struct {
 	IsActive bool
 }
 
-// GetInfo memakai value receiver karena hanya membaca data.
+// GetInfo memakai value receiver karena hanya membaca data
 func (s Student) GetInfo() string {
 	return fmt.Sprintf(
 		"ID: %s | Name: %s | Grade: %.2f | Active: %t",
@@ -21,17 +21,17 @@ func (s Student) GetInfo() string {
 	)
 }
 
-// UpdateGrade memakai pointer receiver karena mengubah nilai Grade.
+// UpdateGrade memakai pointer receiver karena mengubah nilai Grade
 func (s *Student) UpdateGrade(grade float64) {
 	s.Grade = grade
 }
 
-// Activate memakai pointer receiver karena mengubah status mahasiswa.
+// Activate memakai pointer receiver karena mengubah status mahasiswa
 func (s *Student) Activate() {
 	s.IsActive = true
 }
 
-// Deactivate memakai pointer receiver karena mengubah status mahasiswa.
+// Deactivate memakai pointer receiver karena mengubah status mahasiswa
 func (s *Student) Deactivate() {
 	s.IsActive = false
 }
