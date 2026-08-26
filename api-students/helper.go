@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -142,4 +143,19 @@ func parseListQuery(c *fiber.Ctx) ListQuery {
 	}
 
 	return q
+}
+
+// requireJSON memastikan request body menggunakan Content-Type application/json.
+func requireJSON(c *fiber.Ctx) error {
+	contentType := strings.ToLower(c.Get(fiber.HeaderContentType))
+
+	if !strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+		return fail(
+			c,
+			fiber.StatusUnsupportedMediaType,
+			"Content-Type harus application/json",
+		)
+	}
+
+	return c.Next()
 }

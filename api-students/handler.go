@@ -50,8 +50,8 @@ var students = []Student{
 		NIM:       "20250005",
 		Name:      "Eka Putri",
 		Grade:     88,
-		IsActive: true,
-		CreatedAt:  time.Now(),
+		IsActive:  true,
+		CreatedAt: time.Now(),
 	},
 }
 
@@ -414,4 +414,154 @@ func replaceStudent(c *fiber.Ctx) error {
 		"student berhasil diperbarui",
 		students[index],
 	)
+}
+
+// patchStudent menangani PATCH /api/v1/students/:id.
+// PATCH hanya mengubah field yang dikirim oleh client.
+func patchStudent(c *fiber.Ctx) error {
+	id, err := parseStudentID(c)
+
+	if err != nil {
+		return fail(
+			c,
+			fiber.StatusBadRequest,
+			"id harus berupa angka positif",
+		)
+	}
+
+	var req PatchStudentRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return fail(
+			c,
+			fiber.StatusBadRequest,
+			"format JSON tidak valid",
+		)
+	}
+
+	// Pastikan minimal ada satu field yang dikirim.
+	if req.NIM == nil &&
+		req.Name == nil &&
+		req.Grade == nil &&
+		req.IsActive == nil {
+		return failValidation(c, map[string]string{
+			"body": "minimal satu field harus dikirim",
+		})
+	}
+
+	// Validasi field yang dikirim.
+	errors := make(map[string]string)
+
+	if req.NIM != nil && strings.TrimSpace(*req.NIM) == "" {
+		errors["nim"] = "NIM tidak boleh kosong"
+	}
+
+	if req.Name != nil && strings.TrimSpace(*req.Name) == "" {
+		errors["name"] = "nama tidak boleh kosong"
+	}
+
+	if req.Grade != nil && (*req.Grade < 0 || *req.Grade > 100) {
+		errors["grade"] = "grade harus berada di antara 0 dan 100"
+	}
+
+	if len(errors) > 0 {
+		return failValidation(c, errors)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Cari student berdasarkan ID.
+	index := -1
+
+	for i := range students {
+		if students[i].ID == id {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return fail(
+			c,
+			fiber.StatusNotFound,
+			"student tidak ditemukan",
+		)
+	}
+
+	// Jika NIM diubah, pastikan tidak digunakan student lain.
+	if req.NIM != nil {
+		newNIM := strings.TrimSpace(*req.NIM)
+
+		for i, student := range students {
+			if i != index && student.NIM == newNIM {
+				return fail(
+					c,
+					fiber.StatusConflict,
+					"NIM sudah digunakan",
+				)
+			}
+		}
+
+		students[index].NIM = newNIM
+	}
+
+	// Hanya update field yang dikirim.
+	if req.Name != nil {
+		students[index].Name = strings.TrimSpace(*req.Name)
+	}
+
+	if req.Grade != nil {
+		students[index].Grade = *req.Grade
+	}
+
+	if req.IsActive != nil {
+		students[index].IsActive = *req.IsActive
+	}
+
+	return ok(
+		c,
+		"student berhasil diperbarui",
+		students[index],
+	)
+}
+
+// deleteStudent menangani DELETE /api/v1/students/:id.
+func deleteStudent(c *fiber.Ctx) error {
+	id, valid := parsePositiveInt(c, "id")
+
+	if !valid {
+		return fail(
+			c,
+			fiber.StatusBadRequest,
+			"id harus berupa angka positif",
+		)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Cari student berdasarkan ID.
+	index := -1
+
+	for i, student := range students {
+		if student.ID == id {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return fail(
+			c,
+			fiber.StatusNotFound,
+			"student tidak ditemukan",
+		)
+	}
+
+	// Hapus student dari slice.
+	students = append(students[:index], students[index+1:]...)
+
+	// 204 No Content tidak memiliki response body.
+	return noContent(c)
 }
