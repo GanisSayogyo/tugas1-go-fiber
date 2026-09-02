@@ -260,3 +260,248 @@ func (h *StudentHandler) Create(c *fiber.Ctx) error {
 		"data":    student,
 	})
 }
+
+// PUT /api/v1/students/:id
+func (h *StudentHandler) Update(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+
+	if err != nil || id < 1 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "id harus berupa angka positif",
+		})
+	}
+
+	var input struct {
+		NIM      string  `json:"nim"`
+		Name     string  `json:"name"`
+		Grade    float64 `json:"grade"`
+		IsActive bool    `json:"is_active"`
+	}
+
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "body JSON tidak valid",
+		})
+	}
+
+	input.NIM = strings.TrimSpace(input.NIM)
+	input.Name = strings.TrimSpace(input.Name)
+
+	// PUT wajib mengirim seluruh field.
+	if input.NIM == "" {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+			"success": false,
+			"message": "validasi gagal",
+			"errors": fiber.Map{
+				"nim": "NIM wajib diisi",
+			},
+		})
+	}
+
+	if input.Name == "" {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+			"success": false,
+			"message": "validasi gagal",
+			"errors": fiber.Map{
+				"name": "nama wajib diisi",
+			},
+		})
+	}
+
+	if input.Grade < 0 || input.Grade > 100 {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+			"success": false,
+			"message": "validasi gagal",
+			"errors": fiber.Map{
+				"grade": "grade harus berada di antara 0 dan 100",
+			},
+		})
+	}
+
+	student := &model.Student{
+		ID:       id,
+		NIM:      input.NIM,
+		Name:     input.Name,
+		Grade:    input.Grade,
+		IsActive: input.IsActive,
+	}
+
+	err = h.repo.Update(c.Context(), student)
+
+	if errors.Is(err, repository.ErrNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"success": false,
+			"message": "student tidak ditemukan",
+		})
+	}
+
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"success": false,
+				"message": "NIM sudah digunakan",
+			})
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "gagal memperbarui student",
+		})
+	}
+
+	updated, err := h.repo.FindByID(c.Context(), id)
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "gagal mengambil student setelah diperbarui",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"message": "student berhasil diperbarui",
+		"data":    updated,
+	})
+}
+
+// PATCH /api/v1/students/:id
+func (h *StudentHandler) Patch(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+
+	if err != nil || id < 1 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "id harus berupa angka positif",
+		})
+	}
+
+	var input struct {
+		NIM      *string  `json:"nim,omitempty"`
+		Name     *string  `json:"name,omitempty"`
+		Grade    *float64 `json:"grade,omitempty"`
+		IsActive *bool    `json:"is_active,omitempty"`
+	}
+
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "body JSON tidak valid",
+		})
+	}
+
+	if input.NIM != nil {
+		value := strings.TrimSpace(*input.NIM)
+
+		if value == "" {
+			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+				"success": false,
+				"message": "validasi gagal",
+				"errors": fiber.Map{
+					"nim": "NIM tidak boleh kosong",
+				},
+			})
+		}
+
+		input.NIM = &value
+	}
+
+	if input.Name != nil {
+		value := strings.TrimSpace(*input.Name)
+
+		if value == "" {
+			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+				"success": false,
+				"message": "validasi gagal",
+				"errors": fiber.Map{
+					"name": "nama tidak boleh kosong",
+				},
+			})
+		}
+
+		input.Name = &value
+	}
+
+	if input.Grade != nil {
+		if *input.Grade < 0 || *input.Grade > 100 {
+			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+				"success": false,
+				"message": "validasi gagal",
+				"errors": fiber.Map{
+					"grade": "grade harus berada di antara 0 dan 100",
+				},
+			})
+		}
+	}
+
+	updated, err := h.repo.Patch(
+		c.Context(),
+		id,
+		input.NIM,
+		input.Name,
+		input.Grade,
+		input.IsActive,
+	)
+
+	if errors.Is(err, repository.ErrNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"success": false,
+			"message": "student tidak ditemukan",
+		})
+	}
+
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"success": false,
+				"message": "NIM sudah digunakan",
+			})
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "gagal memperbarui student",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"message": "student berhasil diperbarui",
+		"data":    updated,
+	})
+}
+
+// DELETE /api/v1/students/:id
+func (h *StudentHandler) Delete(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+
+	if err != nil || id < 1 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "id harus berupa angka positif",
+		})
+	}
+
+	err = h.repo.Delete(c.Context(), id)
+
+	if errors.Is(err, repository.ErrNotFound) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"success": false,
+			"message": "student tidak ditemukan",
+		})
+	}
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "gagal menghapus student",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"message": "student berhasil dihapus",
+	})
+}

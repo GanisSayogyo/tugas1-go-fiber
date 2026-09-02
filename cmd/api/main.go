@@ -38,6 +38,9 @@ func main() {
 	api.Get("/students", studentHandler.GetAll)
 	api.Get("/students/:id", studentHandler.GetByID)
 	api.Post("/students", studentHandler.Create)
+	api.Put("/students/:id", studentHandler.Update)
+	api.Patch("/students/:id", studentHandler.Patch)
+	api.Delete("/students/:id", studentHandler.Delete)
 
 	log.Println("Student API running on http://localhost:3000")
 
