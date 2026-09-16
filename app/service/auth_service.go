@@ -14,6 +14,7 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("username atau password salah")
 	ErrUserInactive       = errors.New("user tidak aktif")
+	ErrUserDuplicate      = errors.New("username atau email sudah digunakan")
 )
 
 type AuthService struct {
