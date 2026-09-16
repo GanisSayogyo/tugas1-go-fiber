@@ -55,6 +55,10 @@ func (s *AuthService) Register(
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
+		if errors.Is(err, repository.ErrUserDuplicate) {
+			return nil, ErrUserDuplicate
+		}
+
 		return nil, err
 	}
 
