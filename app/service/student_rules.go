@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/model"
+	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
 )
 
 // ValidateCreate memeriksa request POST student.
@@ -97,4 +98,18 @@ func CountTotalPages(total, limit int) int {
 	}
 
 	return (total + limit - 1) / limit
+}
+
+// CanAccessStudent menentukan apakah user boleh mengakses student.
+func CanAccessStudent(
+	current model.AuthUser,
+	ownerID int,
+	perms *helper.PermissionSet,
+	anyPermission string,
+) bool {
+	if current.UserID == ownerID {
+		return true
+	}
+
+	return perms.Can(current.Role, anyPermission)
 }
