@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -29,8 +30,29 @@ func NewStudentHandler(
 	}
 }
 
+func logStudentRequest(c *fiber.Ctx) {
+	user, ok := helper.CurrentUser(c)
+	if !ok {
+		log.Printf(
+			"student request method=%s path=%s user_id=unknown role=unknown",
+			c.Method(),
+			c.Path(),
+		)
+		return
+	}
+
+	log.Printf(
+		"student request method=%s path=%s user_id=%d role=%s",
+		c.Method(),
+		c.Path(),
+		user.UserID,
+		user.Role,
+	)
+}
+
 // GET /api/v1/students
 func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
+	logStudentRequest(c)
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
 
@@ -159,6 +181,7 @@ func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 
 // GET /api/v1/students/:id
 func (h *StudentHandler) GetByID(c *fiber.Ctx) error {
+	logStudentRequest(c)
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil || id < 1 {
@@ -207,6 +230,7 @@ func (h *StudentHandler) GetByID(c *fiber.Ctx) error {
 
 // POST /api/v1/students
 func (h *StudentHandler) Create(c *fiber.Ctx) error {
+	logStudentRequest(c)
 	var input struct {
 		NIM      string  `json:"nim"`
 		Name     string  `json:"name"`
@@ -290,6 +314,7 @@ func (h *StudentHandler) Create(c *fiber.Ctx) error {
 
 // PUT /api/v1/students/:id
 func (h *StudentHandler) Update(c *fiber.Ctx) error {
+	logStudentRequest(c)
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil || id < 1 {
@@ -420,6 +445,7 @@ func (h *StudentHandler) Update(c *fiber.Ctx) error {
 
 // PATCH /api/v1/students/:id
 func (h *StudentHandler) Patch(c *fiber.Ctx) error {
+	logStudentRequest(c)
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil || id < 1 {
@@ -550,6 +576,7 @@ func (h *StudentHandler) Patch(c *fiber.Ctx) error {
 
 // DELETE /api/v1/students/:id
 func (h *StudentHandler) Delete(c *fiber.Ctx) error {
+	logStudentRequest(c)
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil || id < 1 {
