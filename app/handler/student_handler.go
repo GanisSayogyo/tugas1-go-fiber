@@ -299,6 +299,30 @@ func (h *StudentHandler) Update(c *fiber.Ctx) error {
 		})
 	}
 
+	currentUser, ok := helper.CurrentUser(c)
+	if !ok {
+		return helper.Fail(c, fiber.StatusUnauthorized, "belum terautentikasi")
+	}
+
+	existing, err := h.repo.FindByID(c.Context(), id)
+
+	if errors.Is(err, repository.ErrNotFound) {
+		return helper.Fail(c, fiber.StatusNotFound, "student tidak ditemukan")
+	}
+
+	if err != nil {
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil student")
+	}
+
+	if !service.CanAccessStudent(
+		currentUser,
+		existing.OwnerID,
+		h.permissions,
+		"student:update:any",
+	) {
+		return helper.Fail(c, fiber.StatusForbidden, "tidak memiliki akses ke student ini")
+	}
+
 	var input struct {
 		NIM      string  `json:"nim"`
 		Name     string  `json:"name"`
