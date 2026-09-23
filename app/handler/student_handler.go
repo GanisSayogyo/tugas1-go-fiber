@@ -254,11 +254,17 @@ func (h *StudentHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	currentUser, ok := helper.CurrentUser(c)
+	if !ok {
+		return helper.Fail(c, fiber.StatusUnauthorized, "belum terautentikasi")
+	}
+
 	student := &model.Student{
 		NIM:      input.NIM,
 		Name:     input.Name,
 		Grade:    input.Grade,
 		IsActive: input.IsActive,
+		OwnerID:  currentUser.UserID,
 	}
 
 	if err := h.repo.Create(c.Context(), student); err != nil {
