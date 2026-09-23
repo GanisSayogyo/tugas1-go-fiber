@@ -58,7 +58,10 @@ func main() {
 		studentRepository,
 		permissions,
 	)
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(
+		authService,
+		permissions,
+	)
 
 	// Fiber
 	app := fiber.New()

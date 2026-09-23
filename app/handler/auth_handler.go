@@ -8,15 +8,21 @@ import (
 
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/model"
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/service"
+	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
 )
 
 type AuthHandler struct {
 	authService *service.AuthService
+	permissions *helper.PermissionSet
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+func NewAuthHandler(
+	authService *service.AuthService,
+	permissions *helper.PermissionSet,
+) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		permissions: permissions,
 	}
 }
 
@@ -178,15 +184,18 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 		})
 	}
 
+	permissions := h.permissions.PermissionsOf(user.Role)
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"data": fiber.Map{
-			"id":         user.ID,
-			"username":   user.Username,
-			"email":      user.Email,
-			"role":       user.Role,
-			"is_active":  user.IsActive,
-			"created_at": user.CreatedAt,
+			"id":          user.ID,
+			"username":    user.Username,
+			"email":       user.Email,
+			"role":        user.Role,
+			"permissions": permissions,
+			"is_active":   user.IsActive,
+			"created_at":  user.CreatedAt,
 		},
 	})
 }
