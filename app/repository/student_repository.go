@@ -38,7 +38,7 @@ func (r *StudentRepository) FindByID(
 	err := r.db.QueryRow(
 		ctx,
 		`
-		SELECT id, nim, name, grade, is_active, created_at
+		SELECT id, nim, name, grade, is_active, owner_id, created_at
 		FROM students
 		WHERE id = $1
 		`,
@@ -49,6 +49,7 @@ func (r *StudentRepository) FindByID(
 		&student.Name,
 		&student.Grade,
 		&student.IsActive,
+		&student.OwnerID,
 		&student.CreatedAt,
 	)
 
@@ -101,7 +102,7 @@ func (r *StudentRepository) FindAll(
 	}
 
 	query := `
-		SELECT id, nim, name, grade, is_active, created_at
+		SELECT id, nim, name, grade, is_active, owner_id, created_at
 		FROM students
 		WHERE
 			($1 = '' OR nim ILIKE '%' || $1 || '%' OR name ILIKE '%' || $1 || '%')
@@ -140,6 +141,7 @@ func (r *StudentRepository) FindAll(
 			&student.Name,
 			&student.Grade,
 			&student.IsActive,
+			&student.OwnerID,
 			&student.CreatedAt,
 		)
 
@@ -166,14 +168,15 @@ func (r *StudentRepository) Create(
 	err := r.db.QueryRow(
 		ctx,
 		`
-		INSERT INTO students (nim, name, grade, is_active)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO students (nim, name, grade, is_active, owner_id)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at
 		`,
 		student.NIM,
 		student.Name,
 		student.Grade,
 		student.IsActive,
+		student.OwnerID,
 	).Scan(
 		&student.ID,
 		&student.CreatedAt,
