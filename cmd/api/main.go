@@ -12,6 +12,7 @@ import (
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/service"
 	"github.com/GanisSayogyo/tugas1-go-fiber/config"
 	"github.com/GanisSayogyo/tugas1-go-fiber/database"
+	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
 	"github.com/GanisSayogyo/tugas1-go-fiber/route"
 )
 
@@ -36,6 +37,15 @@ func main() {
 	studentRepository := repository.NewStudentRepository(db)
 	userRepository := repository.NewUserRepository(db)
 	tokenRepository := repository.NewTokenRepository(db)
+	roleRepository := repository.NewRoleRepository(db)
+
+	// Load RBAC permissions
+	rawPermissions, err := roleRepository.LoadPermissions(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	permissions := helper.NewPermissionSet(rawPermissions)
 
 	// Service
 	authService := service.NewAuthService(
@@ -55,6 +65,7 @@ func main() {
 		app,
 		authHandler,
 		studentHandler,
+		permissions,
 	)
 
 	port := config.GetEnv("APP_PORT", "3000")

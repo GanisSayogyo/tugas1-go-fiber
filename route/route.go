@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/handler"
+	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
 	"github.com/GanisSayogyo/tugas1-go-fiber/middleware"
 )
 
@@ -11,6 +12,7 @@ func Setup(
 	app *fiber.App,
 	authHandler *handler.AuthHandler,
 	studentHandler *handler.StudentHandler,
+	permissions *helper.PermissionSet,
 ) {
 	api := app.Group("/api/v1")
 
@@ -34,10 +36,26 @@ func Setup(
 
 	students := api.Group("/students", middleware.RequireAuth)
 
-	students.Get("/", studentHandler.GetAll)
+	students.Get(
+		"/",
+		middleware.RequirePermission(permissions, "student:list"),
+		studentHandler.GetAll,
+	)
+
 	students.Get("/:id", studentHandler.GetByID)
-	students.Post("/", studentHandler.Create)
+
+	students.Post(
+		"/",
+		middleware.RequirePermission(permissions, "student:create"),
+		studentHandler.Create,
+	)
+
 	students.Put("/:id", studentHandler.Update)
 	students.Patch("/:id", studentHandler.Patch)
-	students.Delete("/:id", studentHandler.Delete)
+
+	students.Delete(
+		"/:id",
+		middleware.RequirePermission(permissions, "student:delete"),
+		studentHandler.Delete,
+	)
 }
