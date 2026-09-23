@@ -10,15 +10,22 @@ import (
 
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/model"
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/repository"
+	"github.com/GanisSayogyo/tugas1-go-fiber/app/service"
+	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
 )
 
 type StudentHandler struct {
-	repo *repository.StudentRepository
+	repo        *repository.StudentRepository
+	permissions *helper.PermissionSet
 }
 
-func NewStudentHandler(repo *repository.StudentRepository) *StudentHandler {
+func NewStudentHandler(
+	repo *repository.StudentRepository,
+	permissions *helper.PermissionSet,
+) *StudentHandler {
 	return &StudentHandler{
-		repo: repo,
+		repo:        repo,
+		permissions: permissions,
 	}
 }
 
@@ -175,6 +182,20 @@ func (h *StudentHandler) GetByID(c *fiber.Ctx) error {
 			"success": false,
 			"message": "gagal mengambil student",
 		})
+	}
+
+	currentUser, ok := helper.CurrentUser(c)
+	if !ok {
+		return helper.Fail(c, fiber.StatusUnauthorized, "belum terautentikasi")
+	}
+
+	if !service.CanAccessStudent(
+		currentUser,
+		student.OwnerID,
+		h.permissions,
+		"student:read:any",
+	) {
+		return helper.Fail(c, fiber.StatusForbidden, "tidak memiliki akses ke student ini")
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
