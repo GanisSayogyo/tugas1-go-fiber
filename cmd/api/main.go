@@ -13,6 +13,7 @@ import (
 	"github.com/GanisSayogyo/tugas1-go-fiber/config"
 	"github.com/GanisSayogyo/tugas1-go-fiber/database"
 	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
+	"github.com/GanisSayogyo/tugas1-go-fiber/middleware"
 	"github.com/GanisSayogyo/tugas1-go-fiber/route"
 )
 
@@ -69,6 +70,9 @@ func main() {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: config.ErrorHandler(logger),
 	})
+
+	app.Use(middleware.RequestID())
+	app.Use(middleware.RequestLogger(logger))
 
 	// Routes
 	route.Setup(
