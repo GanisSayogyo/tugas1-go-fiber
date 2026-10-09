@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -287,4 +288,53 @@ func (r *StudentRepository) Delete(
 	}
 
 	return nil
+}
+
+// FindAfterCursor mengambil halaman student berikutnya berdasarkan cursor.
+func (r *StudentRepository) FindAfterCursor(
+	ctx context.Context,
+	cursorCreatedAt *time.Time,
+	cursorID *int,
+	limit int,
+) ([]model.Student, error) {
+	query := `
+		SELECT id, nim, name, grade, is_active, owner_id, created_at
+		FROM students
+		WHERE (
+			$1::timestamptz IS NULL
+			OR (created_at, id) < ($1::timestamptz, $2::int)
+		)
+		ORDER BY created_at DESC, id DESC
+		LIMIT $3
+	`
+
+	rows, err := r.db.Query(ctx, query, cursorCreatedAt, cursorID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	students := make([]model.Student, 0)
+
+	for rows.Next() {
+		var student model.Student
+		if err := rows.Scan(
+			&student.ID,
+			&student.NIM,
+			&student.Name,
+			&student.Grade,
+			&student.IsActive,
+			&student.OwnerID,
+			&student.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		students = append(students, student)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return students, nil
 }

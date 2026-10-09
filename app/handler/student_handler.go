@@ -3,9 +3,9 @@ package handler
 import (
 	"errors"
 	"log"
-	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -66,81 +66,59 @@ func parseStudentID(c *fiber.Ctx) (int, error) {
 func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 	logStudentRequest(c)
 
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 10)
-
-	if page < 1 {
-		return helper.Fail(c, fiber.StatusBadRequest, "page harus lebih besar dari 0")
-	}
-	if limit < 1 || limit > 100 {
+	limit, err := strconv.Atoi(c.Query("limit", "10"))
+	if err != nil || limit < 1 || limit > 100 {
 		return helper.Fail(c, fiber.StatusBadRequest, "limit harus berada di antara 1 dan 100")
 	}
 
-	search := strings.TrimSpace(c.Query("search"))
+	var cursorCreatedAt *time.Time
+	var cursorID *int
 
-	var isActive *bool
-	if value := c.Context().QueryArgs().Peek("is_active"); len(value) > 0 {
-		parsed, err := strconv.ParseBool(string(value))
+	cursor := c.Query("cursor")
+	if cursor != "" {
+		createdAt, id, err := helper.DecodeCursor(cursor)
 		if err != nil {
-			return helper.Fail(c, fiber.StatusBadRequest, "is_active harus berupa true atau false")
+			return helper.Fail(c, fiber.StatusBadRequest, "cursor tidak valid")
 		}
-		isActive = &parsed
+
+		cursorCreatedAt = &createdAt
+		cursorID = &id
 	}
 
-	var minGrade *float64
-	if value := c.Query("min_grade"); value != "" {
-		parsed, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return helper.Fail(c, fiber.StatusBadRequest, "min_grade harus berupa angka")
-		}
-		minGrade = &parsed
-	}
-
-	var maxGrade *float64
-	if value := c.Query("max_grade"); value != "" {
-		parsed, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return helper.Fail(c, fiber.StatusBadRequest, "max_grade harus berupa angka")
-		}
-		maxGrade = &parsed
-	}
-
-	sortField := c.Query("sort", "id")
-	allowedSort := map[string]bool{
-		"id": true, "nim": true, "name": true,
-		"grade": true, "is_active": true, "created_at": true,
-	}
-	if !allowedSort[sortField] {
-		return helper.Fail(c, fiber.StatusBadRequest, "sort field tidak valid")
-	}
-
-	sortOrder := strings.ToLower(c.Query("order", "asc"))
-	if sortOrder != "asc" && sortOrder != "desc" {
-		return helper.Fail(c, fiber.StatusBadRequest, "order harus asc atau desc")
-	}
-
-	offset := (page - 1) * limit
-	students, total, err := h.repo.FindAll(
-		c.Context(), search, isActive, minGrade, maxGrade,
-		sortField, sortOrder, limit, offset,
+	students, err := h.repo.FindAfterCursor(
+		c.Context(),
+		cursorCreatedAt,
+		cursorID,
+		limit+1,
 	)
 	if err != nil {
+		log.Printf("ERROR: gagal mengambil student: %v", err)
 		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil data student")
 	}
 
-	totalPages := 0
-	if total > 0 {
-		totalPages = int(math.Ceil(float64(total) / float64(limit)))
+	hasMore := len(students) > limit
+	if hasMore {
+		students = students[:limit]
+	}
+
+	meta := fiber.Map{
+		"limit":    limit,
+		"has_more": hasMore,
+	}
+
+	if hasMore && len(students) > 0 {
+		lastStudent := students[len(students)-1]
+		meta["next_cursor"] = helper.EncodeCursor(
+			lastStudent.CreatedAt,
+			lastStudent.ID,
+		)
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"message": "student berhasil ditemukan",
 		"data":    students,
-		"meta": fiber.Map{
-			"page": page, "limit": limit,
-			"total": total, "total_pages": totalPages,
-		},
+		"meta":    meta,
 	})
 }
 
