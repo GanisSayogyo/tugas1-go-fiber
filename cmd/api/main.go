@@ -64,7 +64,11 @@ func main() {
 	)
 
 	// Fiber
-	app := fiber.New()
+	logger := config.NewLogger()
+
+	app := fiber.New(fiber.Config{
+		ErrorHandler: config.ErrorHandler(logger),
+	})
 
 	// Routes
 	route.Setup(
