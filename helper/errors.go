@@ -116,3 +116,19 @@ func Internal(err error) *AppError {
 		cause:   fmt.Errorf("internal error: %w", err),
 	}
 }
+
+func (e *AppError) GetStatus() int {
+	return e.Status
+}
+
+func (e *AppError) GetCode() string {
+	return e.Code
+}
+
+func (e *AppError) GetMessage() string {
+	return e.Message
+}
+
+func (e *AppError) GetFields() map[string]string {
+	return e.Fields
+}
