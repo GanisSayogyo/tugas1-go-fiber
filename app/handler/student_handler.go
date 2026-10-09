@@ -35,54 +35,55 @@ func logStudentRequest(c *fiber.Ctx) {
 	if !ok {
 		log.Printf(
 			"student request method=%s path=%s user_id=unknown role=unknown",
-			c.Method(),
-			c.Path(),
+			c.Method(), c.Path(),
 		)
 		return
 	}
 
 	log.Printf(
 		"student request method=%s path=%s user_id=%d role=%s",
-		c.Method(),
-		c.Path(),
-		user.UserID,
-		user.Role,
+		c.Method(), c.Path(), user.UserID, user.Role,
 	)
+}
+
+func validationFailed(c *fiber.Ctx, validationErrors map[string]string) error {
+	return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+		"success": false,
+		"message": "validasi gagal",
+		"errors":  validationErrors,
+	})
+}
+
+func parseStudentID(c *fiber.Ctx) (int, error) {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil || id < 1 {
+		return 0, fiber.NewError(fiber.StatusBadRequest, "id harus berupa angka positif")
+	}
+	return id, nil
 }
 
 // GET /api/v1/students
 func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 	logStudentRequest(c)
+
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
 
 	if page < 1 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "page harus lebih besar dari 0",
-		})
+		return helper.Fail(c, fiber.StatusBadRequest, "page harus lebih besar dari 0")
 	}
-
 	if limit < 1 || limit > 100 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "limit harus berada di antara 1 dan 100",
-		})
+		return helper.Fail(c, fiber.StatusBadRequest, "limit harus berada di antara 1 dan 100")
 	}
 
 	search := strings.TrimSpace(c.Query("search"))
 
 	var isActive *bool
-
 	if value := c.Context().QueryArgs().Peek("is_active"); len(value) > 0 {
 		parsed, err := strconv.ParseBool(string(value))
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"success": false,
-				"message": "is_active harus berupa true atau false",
-			})
+			return helper.Fail(c, fiber.StatusBadRequest, "is_active harus berupa true atau false")
 		}
-
 		isActive = &parsed
 	}
 
@@ -90,12 +91,8 @@ func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 	if value := c.Query("min_grade"); value != "" {
 		parsed, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"success": false,
-				"message": "min_grade harus berupa angka",
-			})
+			return helper.Fail(c, fiber.StatusBadRequest, "min_grade harus berupa angka")
 		}
-
 		minGrade = &parsed
 	}
 
@@ -103,62 +100,32 @@ func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 	if value := c.Query("max_grade"); value != "" {
 		parsed, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"success": false,
-				"message": "max_grade harus berupa angka",
-			})
+			return helper.Fail(c, fiber.StatusBadRequest, "max_grade harus berupa angka")
 		}
-
 		maxGrade = &parsed
 	}
 
-	// Whitelist sorting untuk mencegah SQL Injection.
 	sortField := c.Query("sort", "id")
-
 	allowedSort := map[string]bool{
-		"id":         true,
-		"nim":        true,
-		"name":       true,
-		"grade":      true,
-		"is_active":  true,
-		"created_at": true,
+		"id": true, "nim": true, "name": true,
+		"grade": true, "is_active": true, "created_at": true,
 	}
-
 	if !allowedSort[sortField] {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "sort field tidak valid",
-		})
+		return helper.Fail(c, fiber.StatusBadRequest, "sort field tidak valid")
 	}
 
 	sortOrder := strings.ToLower(c.Query("order", "asc"))
-
 	if sortOrder != "asc" && sortOrder != "desc" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "order harus asc atau desc",
-		})
+		return helper.Fail(c, fiber.StatusBadRequest, "order harus asc atau desc")
 	}
 
 	offset := (page - 1) * limit
-
 	students, total, err := h.repo.FindAll(
-		c.Context(),
-		search,
-		isActive,
-		minGrade,
-		maxGrade,
-		sortField,
-		sortOrder,
-		limit,
-		offset,
+		c.Context(), search, isActive, minGrade, maxGrade,
+		sortField, sortOrder, limit, offset,
 	)
-
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "gagal mengambil data student",
-		})
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil data student")
 	}
 
 	totalPages := 0
@@ -171,10 +138,8 @@ func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 		"message": "student berhasil ditemukan",
 		"data":    students,
 		"meta": fiber.Map{
-			"page":        page,
-			"limit":       limit,
-			"total":       total,
-			"total_pages": totalPages,
+			"page": page, "limit": limit,
+			"total": total, "total_pages": totalPages,
 		},
 	})
 }
@@ -182,29 +147,18 @@ func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 // GET /api/v1/students/:id
 func (h *StudentHandler) GetByID(c *fiber.Ctx) error {
 	logStudentRequest(c)
-	id, err := strconv.Atoi(c.Params("id"))
 
-	if err != nil || id < 1 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "id harus berupa angka positif",
-		})
+	id, err := parseStudentID(c)
+	if err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	student, err := h.repo.FindByID(c.Context(), id)
-
 	if errors.Is(err, repository.ErrNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"success": false,
-			"message": "student tidak ditemukan",
-		})
+		return helper.Fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
-
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "gagal mengambil student",
-		})
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil student")
 	}
 
 	currentUser, ok := helper.CurrentUser(c)
@@ -213,10 +167,7 @@ func (h *StudentHandler) GetByID(c *fiber.Ctx) error {
 	}
 
 	if !service.CanAccessStudent(
-		currentUser,
-		student.OwnerID,
-		h.permissions,
-		"student:read:any",
+		currentUser, student.OwnerID, h.permissions, "student:read:any",
 	) {
 		return helper.Fail(c, fiber.StatusForbidden, "tidak memiliki akses ke student ini")
 	}
@@ -231,51 +182,17 @@ func (h *StudentHandler) GetByID(c *fiber.Ctx) error {
 // POST /api/v1/students
 func (h *StudentHandler) Create(c *fiber.Ctx) error {
 	logStudentRequest(c)
-	var input struct {
-		NIM      string  `json:"nim"`
-		Name     string  `json:"name"`
-		Grade    float64 `json:"grade"`
-		IsActive bool    `json:"is_active"`
-	}
 
+	var input model.CreateStudentRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "body JSON tidak valid",
-		})
+		return helper.Fail(c, fiber.StatusBadRequest, "body JSON tidak valid")
 	}
 
 	input.NIM = strings.TrimSpace(input.NIM)
 	input.Name = strings.TrimSpace(input.Name)
 
-	if input.NIM == "" {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"message": "validasi gagal",
-			"errors": fiber.Map{
-				"nim": "NIM wajib diisi",
-			},
-		})
-	}
-
-	if input.Name == "" {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"message": "validasi gagal",
-			"errors": fiber.Map{
-				"name": "nama wajib diisi",
-			},
-		})
-	}
-
-	if input.Grade < 0 || input.Grade > 100 {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"message": "validasi gagal",
-			"errors": fiber.Map{
-				"grade": "grade harus berada di antara 0 dan 100",
-			},
-		})
+	if validationErrors := helper.ValidateStruct(input); len(validationErrors) > 0 {
+		return validationFailed(c, validationErrors)
 	}
 
 	currentUser, ok := helper.CurrentUser(c)
@@ -293,16 +210,9 @@ func (h *StudentHandler) Create(c *fiber.Ctx) error {
 
 	if err := h.repo.Create(c.Context(), student); err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"success": false,
-				"message": "NIM sudah digunakan",
-			})
+			return helper.Fail(c, fiber.StatusConflict, "NIM sudah digunakan")
 		}
-
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "gagal membuat student",
-		})
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal membuat student")
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -315,13 +225,10 @@ func (h *StudentHandler) Create(c *fiber.Ctx) error {
 // PUT /api/v1/students/:id
 func (h *StudentHandler) Update(c *fiber.Ctx) error {
 	logStudentRequest(c)
-	id, err := strconv.Atoi(c.Params("id"))
 
-	if err != nil || id < 1 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "id harus berupa angka positif",
-		})
+	id, err := parseStudentID(c)
+	if err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	currentUser, ok := helper.CurrentUser(c)
@@ -330,70 +237,29 @@ func (h *StudentHandler) Update(c *fiber.Ctx) error {
 	}
 
 	existing, err := h.repo.FindByID(c.Context(), id)
-
 	if errors.Is(err, repository.ErrNotFound) {
 		return helper.Fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
-
 	if err != nil {
 		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil student")
 	}
 
 	if !service.CanAccessStudent(
-		currentUser,
-		existing.OwnerID,
-		h.permissions,
-		"student:update:any",
+		currentUser, existing.OwnerID, h.permissions, "student:update:any",
 	) {
 		return helper.Fail(c, fiber.StatusForbidden, "tidak memiliki akses ke student ini")
 	}
 
-	var input struct {
-		NIM      string  `json:"nim"`
-		Name     string  `json:"name"`
-		Grade    float64 `json:"grade"`
-		IsActive bool    `json:"is_active"`
-	}
-
+	var input model.UpdateStudentRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "body JSON tidak valid",
-		})
+		return helper.Fail(c, fiber.StatusBadRequest, "body JSON tidak valid")
 	}
 
 	input.NIM = strings.TrimSpace(input.NIM)
 	input.Name = strings.TrimSpace(input.Name)
 
-	// PUT wajib mengirim seluruh field.
-	if input.NIM == "" {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"message": "validasi gagal",
-			"errors": fiber.Map{
-				"nim": "NIM wajib diisi",
-			},
-		})
-	}
-
-	if input.Name == "" {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"message": "validasi gagal",
-			"errors": fiber.Map{
-				"name": "nama wajib diisi",
-			},
-		})
-	}
-
-	if input.Grade < 0 || input.Grade > 100 {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"message": "validasi gagal",
-			"errors": fiber.Map{
-				"grade": "grade harus berada di antara 0 dan 100",
-			},
-		})
+	if validationErrors := helper.ValidateStruct(input); len(validationErrors) > 0 {
+		return validationFailed(c, validationErrors)
 	}
 
 	student := &model.Student{
@@ -405,35 +271,19 @@ func (h *StudentHandler) Update(c *fiber.Ctx) error {
 	}
 
 	err = h.repo.Update(c.Context(), student)
-
 	if errors.Is(err, repository.ErrNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"success": false,
-			"message": "student tidak ditemukan",
-		})
+		return helper.Fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
-
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"success": false,
-				"message": "NIM sudah digunakan",
-			})
+			return helper.Fail(c, fiber.StatusConflict, "NIM sudah digunakan")
 		}
-
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "gagal memperbarui student",
-		})
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal memperbarui student")
 	}
 
 	updated, err := h.repo.FindByID(c.Context(), id)
-
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "gagal mengambil student setelah diperbarui",
-		})
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil student setelah diperbarui")
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -446,13 +296,10 @@ func (h *StudentHandler) Update(c *fiber.Ctx) error {
 // PATCH /api/v1/students/:id
 func (h *StudentHandler) Patch(c *fiber.Ctx) error {
 	logStudentRequest(c)
-	id, err := strconv.Atoi(c.Params("id"))
 
-	if err != nil || id < 1 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "id harus berupa angka positif",
-		})
+	id, err := parseStudentID(c)
+	if err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	currentUser, ok := helper.CurrentUser(c)
@@ -461,110 +308,48 @@ func (h *StudentHandler) Patch(c *fiber.Ctx) error {
 	}
 
 	existing, err := h.repo.FindByID(c.Context(), id)
-
 	if errors.Is(err, repository.ErrNotFound) {
 		return helper.Fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
-
 	if err != nil {
 		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil student")
 	}
 
 	if !service.CanAccessStudent(
-		currentUser,
-		existing.OwnerID,
-		h.permissions,
-		"student:update:any",
+		currentUser, existing.OwnerID, h.permissions, "student:update:any",
 	) {
 		return helper.Fail(c, fiber.StatusForbidden, "tidak memiliki akses ke student ini")
 	}
 
-	var input struct {
-		NIM      *string  `json:"nim,omitempty"`
-		Name     *string  `json:"name,omitempty"`
-		Grade    *float64 `json:"grade,omitempty"`
-		IsActive *bool    `json:"is_active,omitempty"`
-	}
-
+	var input model.PatchStudentRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "body JSON tidak valid",
-		})
+		return helper.Fail(c, fiber.StatusBadRequest, "body JSON tidak valid")
 	}
 
 	if input.NIM != nil {
 		value := strings.TrimSpace(*input.NIM)
-
-		if value == "" {
-			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-				"success": false,
-				"message": "validasi gagal",
-				"errors": fiber.Map{
-					"nim": "NIM tidak boleh kosong",
-				},
-			})
-		}
-
 		input.NIM = &value
 	}
-
 	if input.Name != nil {
 		value := strings.TrimSpace(*input.Name)
-
-		if value == "" {
-			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-				"success": false,
-				"message": "validasi gagal",
-				"errors": fiber.Map{
-					"name": "nama tidak boleh kosong",
-				},
-			})
-		}
-
 		input.Name = &value
 	}
 
-	if input.Grade != nil {
-		if *input.Grade < 0 || *input.Grade > 100 {
-			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-				"success": false,
-				"message": "validasi gagal",
-				"errors": fiber.Map{
-					"grade": "grade harus berada di antara 0 dan 100",
-				},
-			})
-		}
+	if validationErrors := helper.ValidateStruct(input); len(validationErrors) > 0 {
+		return validationFailed(c, validationErrors)
 	}
 
 	updated, err := h.repo.Patch(
-		c.Context(),
-		id,
-		input.NIM,
-		input.Name,
-		input.Grade,
-		input.IsActive,
+		c.Context(), id, input.NIM, input.Name, input.Grade, input.IsActive,
 	)
-
 	if errors.Is(err, repository.ErrNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"success": false,
-			"message": "student tidak ditemukan",
-		})
+		return helper.Fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
-
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"success": false,
-				"message": "NIM sudah digunakan",
-			})
+			return helper.Fail(c, fiber.StatusConflict, "NIM sudah digunakan")
 		}
-
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "gagal memperbarui student",
-		})
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal memperbarui student")
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -577,29 +362,18 @@ func (h *StudentHandler) Patch(c *fiber.Ctx) error {
 // DELETE /api/v1/students/:id
 func (h *StudentHandler) Delete(c *fiber.Ctx) error {
 	logStudentRequest(c)
-	id, err := strconv.Atoi(c.Params("id"))
 
-	if err != nil || id < 1 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "id harus berupa angka positif",
-		})
+	id, err := parseStudentID(c)
+	if err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	err = h.repo.Delete(c.Context(), id)
-
 	if errors.Is(err, repository.ErrNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"success": false,
-			"message": "student tidak ditemukan",
-		})
+		return helper.Fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
-
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "gagal menghapus student",
-		})
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal menghapus student")
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{

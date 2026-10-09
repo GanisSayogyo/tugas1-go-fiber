@@ -1,3 +1,4 @@
+
 package model
 
 import "time"
@@ -44,24 +45,24 @@ type WebResponse struct {
 
 // CreateStudentRequest digunakan untuk membuat student baru.
 type CreateStudentRequest struct {
-	NIM      string  `json:"nim"`
-	Name     string  `json:"name"`
-	Grade    float64 `json:"grade"`
+	NIM      string  `json:"nim" validate:"required,nimformat"`
+	Name     string  `json:"name" validate:"required,min=2,max=100"`
+	Grade    float64 `json:"grade" validate:"gte=0,lte=100"`
 	IsActive bool    `json:"is_active"`
 }
 
 // UpdateStudentRequest digunakan untuk mengganti seluruh data student.
 type UpdateStudentRequest struct {
-	NIM      string  `json:"nim"`
-	Name     string  `json:"name"`
-	Grade    float64 `json:"grade"`
+	NIM      string  `json:"nim" validate:"required,nimformat"`
+	Name     string  `json:"name" validate:"required,min=2,max=100"`
+	Grade    float64 `json:"grade" validate:"gte=0,lte=100"`
 	IsActive bool    `json:"is_active"`
 }
 
 // PatchStudentRequest digunakan untuk memperbarui sebagian data student.
 type PatchStudentRequest struct {
-	NIM      *string  `json:"nim,omitempty"`
-	Name     *string  `json:"name,omitempty"`
-	Grade    *float64 `json:"grade,omitempty"`
+	NIM      *string  `json:"nim,omitempty" validate:"omitnil,required,nimformat"`
+	Name     *string  `json:"name,omitempty" validate:"omitnil,required,min=2,max=100"`
+	Grade    *float64 `json:"grade,omitempty" validate:"omitnil,gte=0,lte=100"`
 	IsActive *bool    `json:"is_active,omitempty"`
 }
