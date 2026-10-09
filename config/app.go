@@ -44,6 +44,16 @@ func ErrorHandler(logger *slog.Logger) fiber.ErrorHandler {
 					code = "FORBIDDEN"
 				case fiber.StatusNotFound:
 					code = "NOT_FOUND"
+				case fiber.StatusConflict:
+					code = "CONFLICT"
+				case fiber.StatusUnsupportedMediaType:
+					code = "UNSUPPORTED_MEDIA_TYPE"
+				case fiber.StatusUnprocessableEntity:
+					code = "VALIDATION_ERROR"
+				case fiber.StatusNotAcceptable:
+					code = "NOT_ACCEPTABLE"
+				case fiber.StatusTooManyRequests:
+					code = "TOO_MANY_REQUESTS"
 				default:
 					if status >= fiber.StatusInternalServerError {
 						code = "INTERNAL_ERROR"
