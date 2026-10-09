@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"errors"
 	"log/slog"
 	"time"
 
+	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
@@ -28,11 +30,17 @@ func RequestLogger(logger *slog.Logger) fiber.Handler {
 		err := c.Next()
 
 		status := c.Response().StatusCode()
+
 		if err != nil {
+			var appErr *helper.AppError
 			var fiberErr *fiber.Error
-			if fiberErrStatus(err, &fiberErr) {
+
+			switch {
+			case errors.As(err, &appErr):
+				status = appErr.GetStatus()
+			case errors.As(err, &fiberErr):
 				status = fiberErr.Code
-			} else {
+			default:
 				status = fiber.StatusInternalServerError
 			}
 		}
