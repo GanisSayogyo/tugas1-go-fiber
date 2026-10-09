@@ -9,6 +9,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"encoding/csv"
+	"fmt"
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/model"
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/repository"
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/service"
@@ -62,6 +64,27 @@ func parseStudentID(c *fiber.Ctx) (int, error) {
 	return id, nil
 }
 
+func negotiateStudentFormat(c *fiber.Ctx) (string, error) {
+	accept := strings.TrimSpace(c.Get("Accept"))
+
+	if accept == "" || accept == "*/*" {
+		return "json", nil
+	}
+
+	if strings.Contains(accept, "text/csv") {
+		return "csv", nil
+	}
+
+	if strings.Contains(accept, "application/json") {
+		return "json", nil
+	}
+
+	return "", fiber.NewError(
+		fiber.StatusNotAcceptable,
+		"format response yang diminta tidak tersedia",
+	)
+}
+
 // GET /api/v1/students
 func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 	logStudentRequest(c)
@@ -112,6 +135,40 @@ func (h *StudentHandler) GetAll(c *fiber.Ctx) error {
 			lastStudent.CreatedAt,
 			lastStudent.ID,
 		)
+	}
+
+	format, err := negotiateStudentFormat(c)
+	if err != nil {
+		return err
+	}
+
+	if format == "csv" {
+		csvRows := [][]string{
+			{"id", "nim", "name", "grade", "is_active", "owner_id", "created_at"},
+		}
+
+		for _, student := range students {
+			csvRows = append(csvRows, []string{
+				strconv.Itoa(student.ID),
+				student.NIM,
+				student.Name,
+				fmt.Sprintf("%g", student.Grade),
+				strconv.FormatBool(student.IsActive),
+				strconv.Itoa(student.OwnerID),
+				student.CreatedAt.Format(time.RFC3339Nano),
+			})
+		}
+
+		var output strings.Builder
+		writer := csv.NewWriter(&output)
+
+		if err := writer.WriteAll(csvRows); err != nil {
+			return helper.Fail(c, fiber.StatusInternalServerError, "gagal membuat CSV")
+		}
+
+		c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
+		c.Set(fiber.HeaderContentDisposition, `attachment; filename="students.csv"`)
+		return c.Status(fiber.StatusOK).SendString(output.String())
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -302,6 +359,17 @@ func (h *StudentHandler) Patch(c *fiber.Ctx) error {
 	var input model.PatchStudentRequest
 	if err := c.BodyParser(&input); err != nil {
 		return helper.Fail(c, fiber.StatusBadRequest, "body JSON tidak valid")
+	}
+
+	if input.NIM == nil &&
+		input.Name == nil &&
+		input.Grade == nil &&
+		input.IsActive == nil {
+		return helper.Fail(
+			c,
+			fiber.StatusBadRequest,
+			"minimal satu field harus diisi",
+		)
 	}
 
 	if input.NIM != nil {
