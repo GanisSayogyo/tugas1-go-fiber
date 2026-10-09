@@ -49,11 +49,7 @@ func logStudentRequest(c *fiber.Ctx) {
 }
 
 func validationFailed(c *fiber.Ctx, validationErrors map[string]string) error {
-	return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-		"success": false,
-		"message": "validasi gagal",
-		"errors":  validationErrors,
-	})
+	return helper.Validation(validationErrors)
 }
 
 func parseStudentID(c *fiber.Ctx) (int, error) {
