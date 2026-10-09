@@ -72,7 +72,7 @@ func ErrorHandler(logger *slog.Logger) fiber.ErrorHandler {
 			"success":    false,
 			"message":    message,
 			"code":       code,
-			"request_id": c.Get("X-Request-ID"),
+			"request_id": c.GetRespHeader("X-Request-Id"),
 		}
 
 		if len(fields) > 0 {
