@@ -88,6 +88,15 @@ func Conflict(message string) *AppError {
 	}
 }
 
+// NewError membuat AppError dengan status dan kode khusus.
+func NewError(status int, code, message string) *AppError {
+	return &AppError{
+		Status:  status,
+		Code:    code,
+		Message: message,
+	}
+}
+
 func UnsupportedMedia() *AppError {
 	return &AppError{
 		Status:  fiber.StatusUnsupportedMediaType,
