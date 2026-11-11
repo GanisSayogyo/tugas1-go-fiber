@@ -40,6 +40,13 @@ func main() {
 	tokenRepository := repository.NewTokenRepository(db)
 	roleRepository := repository.NewRoleRepository(db)
 
+	// Course repository dan transaction manager
+	courseRepository := repository.NewCourseRepository(db)
+	txManager := repository.NewTxManager(db)
+
+	// Supervisor repository
+	supervisorRepository := repository.NewSupervisorRepository(db)
+
 	// Load RBAC permissions
 	rawPermissions, err := roleRepository.LoadPermissions(ctx)
 	if err != nil {
@@ -52,6 +59,16 @@ func main() {
 	authService := service.NewAuthService(
 		userRepository,
 		tokenRepository,
+	)
+
+	courseService := service.NewCourseService(
+		courseRepository,
+		txManager,
+	)
+
+	supervisorService := service.NewSupervisorService(
+		supervisorRepository,
+		txManager,
 	)
 
 	// Handler
@@ -79,6 +96,8 @@ func main() {
 		app,
 		authHandler,
 		studentHandler,
+		courseService,
+		supervisorService,
 		permissions,
 	)
 

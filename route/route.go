@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/GanisSayogyo/tugas1-go-fiber/app/handler"
+	"github.com/GanisSayogyo/tugas1-go-fiber/app/service"
 	"github.com/GanisSayogyo/tugas1-go-fiber/helper"
 	"github.com/GanisSayogyo/tugas1-go-fiber/middleware"
 )
@@ -12,6 +13,8 @@ func Setup(
 	app *fiber.App,
 	authHandler *handler.AuthHandler,
 	studentHandler *handler.StudentHandler,
+	courseService *service.CourseService,
+	supervisorService *service.SupervisorService,
 	permissions *helper.PermissionSet,
 ) {
 	api := app.Group("/api/v1")
@@ -58,4 +61,32 @@ func Setup(
 		middleware.RequirePermission(permissions, "student:delete"),
 		studentHandler.Delete,
 	)
+
+	// Courses dan KRS
+	courses := api.Group("/courses", middleware.RequireAuth)
+
+	courses.Get("/", courseService.List)
+	courses.Get("/mine", courseService.Mine)
+	courses.Get("/:id", courseService.Get)
+
+	courses.Post("/:id/enroll", courseService.Enroll)
+	courses.Delete("/:id/enroll", courseService.Cancel)
+
+	// Supervisors dan Supervisions
+	supervisors := api.Group(
+		"/supervisors",
+		middleware.RequireAuth,
+		middleware.RequirePermission(permissions, "supervision:manage"),
+	)
+
+	supervisors.Post("/:id/assign", supervisorService.Assign)
+	supervisors.Patch("/:id", supervisorService.Update)
+
+	supervisions := api.Group(
+		"/supervisions",
+		middleware.RequireAuth,
+		middleware.RequirePermission(permissions, "supervision:manage"),
+	)
+
+	supervisions.Post("/switch", supervisorService.Switch)
 }
